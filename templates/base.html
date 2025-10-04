@@ -1,0 +1,16 @@
+<!DOCTYPE html5>
+<html lang="ru">
+	<head>
+		<meta charset="utf8" />
+		<title>{% block title %}Новостной блог{% endblock %}</title>
+	</head>
+	<body>
+		<nav>
+			<a href="/">Главная</a>
+			<a href="/about">О проекте</a>
+			<a href="/contact">Контакты</a>
+		</nav>
+
+		<div>{% block content %}{% endblock %}</div>
+	</body>
+</html>
