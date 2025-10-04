@@ -1,0 +1,16 @@
+{% extends 'base.html' %} {% block title %}Контакты{% endblock %} {% block
+content %}
+<h1>Обратная связь</h1>
+<form method="post" action="/feedback">
+	<label for="name">Имя:</label><br />
+	<input type="text" id="name" name="name" required /><br />
+
+	<label for="email">email:</label><br />
+	<input type="email" id="email" name="email" required /><br />
+
+	<label for="message">Сообщение:</label><br />
+	<textarea id="message" name="message" row="5" required></textarea><br />
+
+	<button type="submit">Отправить</button>
+</form>
+{% endblock %}
