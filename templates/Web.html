@@ -1,4 +1,14 @@
 {% extends "base.html" %} {% block title %}Главная{% endblock %} {% block
 content %}
 <h1>Добро пожаловать в Новостной Блог!</h1>
+
+<h2>Список статей:</h2>
+<ul>
+	{% for article in articles %}
+	<li>
+		<a href="{{url_for('news', id = article.id)}}">{{article.title}}</a>
+		{{article.date}} {% if article.date == today %} Новое! {% endif %}
+	</li>
+	{% endfor %}
+</ul>
 {% endblock %}
