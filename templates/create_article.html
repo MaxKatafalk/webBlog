@@ -1,0 +1,40 @@
+{% extends "base.html" %} {% block title %}Создать статью{% endblock %} {% block
+content %}
+<h1>Создать новую статью</h1>
+
+<form method="POST">
+	<div>
+		<label>Заголовок:</label><br />
+		<input type="text" name="title" required />
+	</div>
+	<br />
+	<div>
+		<label>Содержание:</label><br />
+		<textarea name="content" rows="10" cols="50" required></textarea>
+	</div>
+	<br />
+	<div>
+		<label>Автор:</label><br />
+		<select name="user_id" required>
+			<option value="">Выберите автора</option>
+			{% for user in users %}
+			<option value="{{ user.id }}">{{ user.name }}</option>
+			{% endfor %}
+		</select>
+	</div>
+	<br />
+	<div>
+		<label>Категория:</label><br />
+		<input type="text" name="category" value="general" required />
+	</div>
+	<br />
+	<div>
+		<button type="submit">Создать статью</button>
+	</div>
+</form>
+
+<br />
+<div>
+	<a href="{{ url_for('default') }}">Назад к списку статей</a>
+</div>
+{% endblock %}

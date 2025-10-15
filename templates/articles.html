@@ -1,0 +1,45 @@
+{% extends "base.html" %} {% block title %} {% if current_category %} Статьи -
+{{ current_category }} {% else %} Все статьи {% endif %} {% endblock %} {% block
+content %}
+<h1>
+	{% if current_category %} Статьи в категории: "{{ current_category }}" {% else
+	%} Все статьи {% endif %}
+</h1>
+
+<div>
+	<strong>Категории:</strong>
+	<a href="{{ url_for('articles') }}">Все</a>
+	{% for x in categories %} |
+	<a href="{{ url_for('articles_by_category', category=cat) }}">{{ x }}</a>
+	{% endfor %}
+</div>
+
+<hr />
+
+{% if articles %}
+<ul>
+	{% for article in articles %}
+	<li>
+		<strong
+			><a href="{{ url_for('news', id=article.id) }}"
+				>{{ article.title }}</a
+			></strong
+		>
+		<br />
+		Категория: {{ article.category }} | Автор: {{ article.author.name }} | Дата:
+		{{ article.created_date.strftime('%Y-%m-%d') }} {% if current_category is
+		none and article.created_date.strftime('%Y-%m-%d') == today %}
+		<strong>Новое!</strong>
+		{% endif %}
+	</li>
+	{% endfor %}
+</ul>
+{% else %}
+<p>Статей не найдено.</p>
+{% endif %}
+
+<div>
+	<a href="{{ url_for('default') }}">На главную</a> |
+	<a href="{{ url_for('create_article') }}">Создать статью</a>
+</div>
+{% endblock %}

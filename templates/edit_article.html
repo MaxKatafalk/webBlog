@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Редактировать статью{% endblock %}
+
+{% block content %}
+<h1>Редактировать статью</h1>
+
+<form method="POST">
+	<div>
+		<label>Заголовок:</label><br>
+		<input type="text" name="title" value="{{ article.title }}" required>
+	</div>
+	<br>
+	<div>
+		<label>Содержание:</label><br>
+		<textarea name="content" rows="10" cols="50" required>{{ article.content }}</textarea>
+	</div>
+	<br>
+	<div>
+		<label>Автор:</label><br>
+		<select name="user_id" required>
+				{% for user in users %}
+				<option value="{{ user.id }}" {% if user.id == article.user_id %}selected{% endif %}>
+					{{ user.name }}
+				</option>
+				{% endfor %}
+		</select>
+	</div>
+	<div>
+		<label>Категория:</label><br>
+		<input type="text" name="category" value="{{ article.category }}" required>
+	</div>
+	<br>
+	<div>
+		<button type="submit">Сохранить изменения</button>
+	</div>
+</form>
+
+<br>
+<div>
+	<a href="{{ url_for('default') }}">Назад к списку статей</a>
+</div>
+{% endblock %}
