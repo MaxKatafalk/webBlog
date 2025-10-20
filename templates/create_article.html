@@ -14,16 +14,6 @@ content %}
 	</div>
 	<br />
 	<div>
-		<label>Автор:</label><br />
-		<select name="user_id" required>
-			<option value="">Выберите автора</option>
-			{% for user in users %}
-			<option value="{{ user.id }}">{{ user.name }}</option>
-			{% endfor %}
-		</select>
-	</div>
-	<br />
-	<div>
 		<label>Категория:</label><br />
 		<input type="text" name="category" value="general" required />
 	</div>

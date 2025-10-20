@@ -8,16 +8,24 @@ content %}
 	<li>
 		<a href="{{url_for('news', id = article.id)}}">{{article.title}}</a>
 		- {{article.created_date.strftime('%Y-%m-%d')}} {% if
-		article.created_date.strftime('%Y-%m-%d') == today %} Новое! {% endif %}
-
+		article.created_date.strftime('%Y-%m-%d') == today %}
+		<strong>Новое!</strong>
+		{% endif %} {% if session.user_id and session.user_id == article.user_id %}
 		<a href="{{ url_for('edit_article', id=article.id) }}">[Редактировать]</a>
-		<a href="{{ url_for('delete_article', id=article.id) }}">[Удалить]</a>
+		<a
+			href="{{ url_for('delete_article', id=article.id) }}"
+			onclick="return confirm('Удалить статью?')"
+			>[Удалить]</a
+		>
+		{% endif %}
 	</li>
 	{% endfor %}
 </ul>
 
+{% if session.user_id %}
 <div>
 	<a href="{{ url_for('create_article') }}">Создать новую статью</a>
 </div>
-
-{% endblock %}
+{% else %}
+<div><a href="{{ url_for('login') }}">Войдите</a>, чтобы создавать статьи</div>
+{% endif %} {% endblock %}

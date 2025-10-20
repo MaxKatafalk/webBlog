@@ -9,8 +9,10 @@ content %}
 <div>
 	<strong>Категории:</strong>
 	<a href="{{ url_for('articles') }}">Все</a>
-	{% for x in categories %} |
-	<a href="{{ url_for('articles_by_category', category=cat) }}">{{ x }}</a>
+	{% for category in categories %} |
+	<a href="{{ url_for('articles_by_category', category=category) }}"
+		>{{ category }}</a
+	>
 	{% endfor %}
 </div>
 

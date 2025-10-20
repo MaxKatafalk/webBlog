@@ -1,0 +1,57 @@
+{% extends "base.html" %} {% block title %}{{ article.title }}{% endblock %} {%
+block content %}
+<h1>{{ article.title }}</h1>
+
+<div>
+	<p><strong>Автор:</strong> {{ article.author.name }}</p>
+	<p>
+		<strong>Дата:</strong> {{ article.created_date.strftime('%Y-%m-%d %H:%M') }}
+	</p>
+	<p><strong>Категория:</strong> {{ article.category }}</p>
+</div>
+
+<hr />
+
+<div>{{ article.text|safe }}</div>
+
+<hr />
+
+<h2>Комментарии ({{ article.comments|length }})</h2>
+
+<div>
+	<h3>Добавить комментарий</h3>
+	<form method="POST">
+		<div>
+			<label>Ваше имя:</label><br />
+			<input type="text" name="author_name" required />
+		</div>
+		<br />
+		<div>
+			<label>Комментарий:</label><br />
+			<textarea name="comment_text" rows="4" cols="50" required></textarea>
+		</div>
+		<br />
+		<div>
+			<button type="submit">Отправить комментарий</button>
+		</div>
+	</form>
+</div>
+
+<div>
+	{% if article.comments %} {% for comment in article.comments %}
+	<div>
+		<strong>{{ comment.author_name }}</strong>
+		<small>{{ comment.date.strftime('%Y-%m-%d %H:%M') }}</small>
+		<p>{{ comment.text }}</p>
+	</div>
+	{% endfor %} {% else %}
+	<p>Пока нет комментариев. Будьте первым!</p>
+	{% endif %}
+</div>
+
+<br />
+<div>
+	<a href="{{ url_for('articles') }}">← К списку статей</a> |
+	<a href="{{ url_for('default') }}">На главную</a>
+</div>
+{% endblock %}

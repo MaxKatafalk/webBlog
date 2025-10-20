@@ -16,7 +16,15 @@
 			<a href="/about">О проекте</a>
 			<a href="/contact">Контакты</a>
 			<a href="/feedback">Обратная связь</a>
-			<a href="/create-article">Создать статью</a>
+
+			{% if session.user_id %}
+			<a href="/create-article">Создать статью</a> |
+			<span>Привет, {{ session.user_name }}!</span> |
+			<a href="/logout">Выйти</a>
+			{% else %}
+			<a href="/login">Войти</a> |
+			<a href="/register">Регистрация</a>
+			{% endif %}
 		</nav>
 
 		<div class="container">{% block content %}{% endblock %}</div>
