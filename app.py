@@ -1,11 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SECRET_KEY'] = 'secret-key'
 
 db = SQLAlchemy(app)
 
@@ -238,6 +238,98 @@ def about():
 def contact():
 	return render_template('contact.html')
 
+@app.route('/api/articles', methods=['GET'])
+def api_get_articles():
+    articles = Article.query.all()
+    
+    articles_list = []
+    for article in articles:
+        articles_list.append({
+            'id': article.id,
+            'title': article.title,
+            'category': article.category,
+            'created_date': article.created_date.isoformat()
+        })
+    
+    return jsonify(articles_list)
+
+@app.route('/api/articles/<int:id>', methods=['GET'])
+def api_get_article(id):
+    article = Article.query.get(id)
+    
+    if not article:
+        return jsonify({'error': 'Статья не найдена'}), 404
+    
+    article_data = {
+        'id': article.id,
+        'title': article.title,
+        'text': article.text,
+        'category': article.category,
+        'created_date': article.created_date.isoformat()
+    }
+    
+    return jsonify(article_data)
+
+@app.route('/api/articles', methods=['POST'])
+def api_create_article():
+    data = request.json
+    
+    if not data.get('title') or not data.get('text'):
+        return jsonify({'error': 'Нужны title и text'}), 400
+    
+    new_article = Article(
+        title=data['title'],
+        text=data['text'],
+        category=data.get('category', 'general'),
+        user_id=session['user_id'] 
+    )
+    
+    db.session.add(new_article)
+    db.session.commit()
+    
+    return jsonify({
+        'id': new_article.id,
+        'title': new_article.title,
+        'text': new_article.text,
+        'category': new_article.category
+    }), 201
+
+@app.route('/api/articles/<int:id>', methods=['PUT'])
+def api_update_article(id):
+    article = Article.query.get(id)
+    if not article:
+        return jsonify({'error': 'Статья не найдена'}), 404
+    
+    data = request.json
+    
+    if not data.get('title') or not data.get('text'):
+        return jsonify({'error': 'Нужны title и text'}), 400
+    
+    article.title = data['title']
+    article.text = data['text']
+    article.category = data.get('category', article.category)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'id': article.id,
+        'title': article.title,
+        'text': article.text,
+        'category': article.category
+    })
+
+@app.route('/api/articles/<int:id>', methods=['DELETE'])
+def api_delete_article(id):
+    article = Article.query.get(id)
+    if not article:
+        return jsonify({'error': 'Статья не найдена'}), 404
+    
+    Comment.query.filter_by(article_id=id).delete()
+    
+    db.session.delete(article)
+    db.session.commit()
+    
+    return jsonify({'message': 'Статья удалена'})
 
 if __name__ == "__main__":
 	app.run(debug=True)
