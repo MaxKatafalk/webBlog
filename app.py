@@ -240,35 +240,31 @@ def contact():
 
 @app.route('/api/articles', methods=['GET'])
 def api_get_articles():
-    articles = Article.query.all()
-    
-    articles_list = []
-    for article in articles:
-        articles_list.append({
-            'id': article.id,
-            'title': article.title,
-            'category': article.category,
-            'created_date': article.created_date.isoformat()
-        })
-    
-    return jsonify(articles_list)
-
-@app.route('/api/articles/<int:id>', methods=['GET'])
-def api_get_article(id):
-    article = Article.query.get(id)
-    
-    if not article:
-        return jsonify({'error': 'Статья не найдена'}), 404
-    
-    article_data = {
-        'id': article.id,
-        'title': article.title,
-        'text': article.text,
-        'category': article.category,
-        'created_date': article.created_date.isoformat()
-    }
-    
-    return jsonify(article_data)
+	category = request.args.get('category')
+	sort = request.args.get('sort')
+	
+	query = Article.query
+	
+	if category:
+		query = query.filter_by(category=category)
+	
+	if sort == 'date':
+		query = query.order_by(Article.created_date.desc())
+	else:
+		query = query.order_by(Article.created_date.desc())
+	
+	articles = query.all()
+	
+	articles_list = []
+	for article in articles:
+		articles_list.append({
+				'id': article.id,
+				'title': article.title,
+				'category': article.category,
+				'created_date': article.created_date.isoformat()
+		})
+	
+	return jsonify(articles_list)
 
 @app.route('/api/articles', methods=['POST'])
 def api_create_article():
@@ -330,6 +326,95 @@ def api_delete_article(id):
     db.session.commit()
     
     return jsonify({'message': 'Статья удалена'})
+
+@app.route('/api/comment', methods=['GET'])
+def api_get_comments():
+	comments = Comment.query.all()
+	
+	comments_list = []
+	for comment in comments:
+		comments_list.append({
+				'id': comment.id,
+				'text': comment.text,
+				'author_name': comment.author_name,
+				'date': comment.date.isoformat(),
+				'article_id': comment.article_id
+		})
+	
+	return jsonify(comments_list)
+
+@app.route('/api/comment/<int:id>', methods=['GET'])
+def api_get_comment(id):
+	comment = Comment.query.get(id)
+	
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	comment_data = {
+		'id': comment.id,
+		'text': comment.text,
+		'author_name': comment.author_name,
+		'date': comment.date.isoformat(),
+		'article_id': comment.article_id
+	}
+	
+	return jsonify(comment_data)
+
+@app.route('/api/comment', methods=['POST'])
+def api_create_comment():
+	data = request.json
+	
+	if not data.get('text') or not data.get('author_name') or not data.get('article_id'):
+		return jsonify({'error': 'Нужны text, author_name и article_id'}), 400
+	
+	new_comment = Comment(
+		text=data['text'],
+		author_name=data['author_name'],
+		article_id=data['article_id']
+	)
+	
+	db.session.add(new_comment)
+	db.session.commit()
+	
+	return jsonify({
+		'id': new_comment.id,
+		'text': new_comment.text,
+		'author_name': new_comment.author_name,
+		'article_id': new_comment.article_id
+	}), 201
+
+@app.route('/api/comment/<int:id>', methods=['PUT'])
+def api_update_comment(id):
+	comment = Comment.query.get(id)
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	data = request.json
+	
+	if not data.get('text'):
+		return jsonify({'error': 'Нужен text'}), 400
+	
+	comment.text = data['text']
+	comment.author_name = data.get('author_name', comment.author_name)
+	
+	db.session.commit()
+	
+	return jsonify({
+		'id': comment.id,
+		'text': comment.text,
+		'author_name': comment.author_name
+	})
+
+@app.route('/api/comment/<int:id>', methods=['DELETE'])
+def api_delete_comment(id):
+	comment = Comment.query.get(id)
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	db.session.delete(comment)
+	db.session.commit()
+	
+	return jsonify({'message': 'Комментарий удален'})
 
 if __name__ == "__main__":
 	app.run(debug=True)
