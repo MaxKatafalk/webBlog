@@ -259,66 +259,97 @@ def api_get_articles():
 	
 	return jsonify(articles_list)
 
-@app.route('/api/articles', methods=['POST'])
-def api_create_article():
-    data = request.json
-    
-    if not data.get('title') or not data.get('text'):
-        return jsonify({'error': 'Нужны title и text'}), 400
-    
-    new_article = Article(
-        title=data['title'],
-        text=data['text'],
-        category=data.get('category', 'general'),
-        user_id=session['user_id'] 
-    )
-    
-    db.session.add(new_article)
-    db.session.commit()
-    
-    return jsonify({
-        'id': new_article.id,
-        'title': new_article.title,
-        'text': new_article.text,
-        'category': new_article.category
-    }), 201
-
-@app.route('/api/articles/<int:id>', methods=['PUT'])
-def api_update_article(id):
+@app.route('/api/articles/<int:id>', methods=['GET'])
+def api_get_article(id):
     article = Article.query.get(id)
     if not article:
         return jsonify({'error': 'Статья не найдена'}), 404
-    
-    data = request.json
-    
-    if not data.get('title') or not data.get('text'):
-        return jsonify({'error': 'Нужны title и text'}), 400
-    
-    article.title = data['title']
-    article.text = data['text']
-    article.category = data.get('category', article.category)
-    
-    db.session.commit()
     
     return jsonify({
         'id': article.id,
         'title': article.title,
         'text': article.text,
-        'category': article.category
+        'category': article.category,
+        'created_date': article.created_date.isoformat(),
+        'user_id': article.user_id
     })
+
+@app.route('/api/articles', methods=['POST'])
+def api_create_article():
+	
+	#if 'user_id' not in session:
+		#return jsonify({'error': 'Требуется авторизация'}), 401
+
+	data = request.json
+	
+	if not data.get('title') or not data.get('text'):
+		return jsonify({'error': 'Нужны title и text'}), 400
+	
+	new_article = Article(
+		title=data['title'],
+		text=data['text'],
+		category=data.get('category', 'general'),
+		user_id=1
+	)
+	
+	db.session.add(new_article)
+	db.session.commit()
+	
+	return jsonify({
+		'id': new_article.id,
+		'title': new_article.title,
+		'text': new_article.text,
+		'category': new_article.category
+	}), 201
+
+@app.route('/api/articles/<int:id>', methods=['PUT'])
+def api_update_article(id):
+	#if 'user_id' not in session:
+		#return jsonify({'error': 'Требуется авторизация'}), 401
+
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	#if article.user_id != session['user_id']:
+		#return jsonify({'error': 'Вы можете редактировать только свои статьи'}), 403
+	
+	data = request.json
+	
+	if not data.get('title') or not data.get('text'):
+		return jsonify({'error': 'Нужны title и text'}), 400
+	
+	article.title = data['title']
+	article.text = data['text']
+	article.category = data.get('category', article.category)
+	
+	db.session.commit()
+	
+	return jsonify({
+		'id': article.id,
+		'title': article.title,
+		'text': article.text,
+		'category': article.category
+	})
 
 @app.route('/api/articles/<int:id>', methods=['DELETE'])
 def api_delete_article(id):
-    article = Article.query.get(id)
-    if not article:
-        return jsonify({'error': 'Статья не найдена'}), 404
-    
-    Comment.query.filter_by(article_id=id).delete()
-    
-    db.session.delete(article)
-    db.session.commit()
-    
-    return jsonify({'message': 'Статья удалена'})
+	#if 'user_id' not in session:
+		#return jsonify({'error': 'Требуется авторизация'}), 401
+
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+
+	#if article.user_id != session['user_id']:
+		#return jsonify({'error': 'Вы можете удалять только свои статьи'}), 403
+	
+	Comment.query.filter_by(article_id=id).delete()
+	
+	db.session.delete(article)
+	db.session.commit()
+	
+	return jsonify({'message': 'Статья удалена'})
 
 @app.route('/api/comment', methods=['GET'])
 def api_get_comments():
