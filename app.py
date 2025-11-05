@@ -136,12 +136,6 @@ def edit_article(id):
 	
 	return render_template('edit_article.html', article=article)
 
-@app.route('/reset-db')
-def reset_db():
-    db.drop_all()
-    db.create_all()
-    return "База пересоздана!"
-
 @app.route('/create-article', methods=['GET', 'POST'])
 def create_article():
 	if 'user_id' not in session:
@@ -186,7 +180,6 @@ def delete_article(id):
 	
 	flash('Статья успешно удалена!', 'success')
 	return redirect(url_for('default'))
-
 
 @app.route('/feedback', methods=['GET', 'POST'])
 def feedback():
