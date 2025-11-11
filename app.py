@@ -277,8 +277,8 @@ def api_get_article(id):
 @app.route('/api/articles', methods=['POST'])
 def api_create_article():
 	
-	#if 'user_id' not in session:
-		#return jsonify({'error': 'Требуется авторизация'}), 401
+	if 'user_id' not in session:
+		return jsonify({'error': 'Требуется авторизация'}), 401
 
 	data = request.json
 	
@@ -289,7 +289,7 @@ def api_create_article():
 		title=data['title'],
 		text=data['text'],
 		category=data.get('category', 'general'),
-		user_id=1
+		user_id=session['user.id']
 	)
 	
 	db.session.add(new_article)
@@ -304,15 +304,15 @@ def api_create_article():
 
 @app.route('/api/articles/<int:id>', methods=['PUT'])
 def api_update_article(id):
-	#if 'user_id' not in session:
-		#return jsonify({'error': 'Требуется авторизация'}), 401
+	if 'user_id' not in session:
+		return jsonify({'error': 'Требуется авторизация'}), 401
 
 	article = Article.query.get(id)
 	if not article:
 		return jsonify({'error': 'Статья не найдена'}), 404
 	
-	#if article.user_id != session['user_id']:
-		#return jsonify({'error': 'Вы можете редактировать только свои статьи'}), 403
+	if article.user_id != session['user_id']:
+		return jsonify({'error': 'Вы можете редактировать только свои статьи'}), 403
 	
 	data = request.json
 	
@@ -334,15 +334,15 @@ def api_update_article(id):
 
 @app.route('/api/articles/<int:id>', methods=['DELETE'])
 def api_delete_article(id):
-	#if 'user_id' not in session:
-		#return jsonify({'error': 'Требуется авторизация'}), 401
+	if 'user_id' not in session:
+		return jsonify({'error': 'Требуется авторизация'}), 401
 
 	article = Article.query.get(id)
 	if not article:
 		return jsonify({'error': 'Статья не найдена'}), 404
 
-	#if article.user_id != session['user_id']:
-		#return jsonify({'error': 'Вы можете удалять только свои статьи'}), 403
+	if article.user_id != session['user_id']:
+		return jsonify({'error': 'Вы можете удалять только свои статьи'}), 403
 	
 	Comment.query.filter_by(article_id=id).delete()
 	
