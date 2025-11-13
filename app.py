@@ -2,12 +2,28 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from datetime import date, datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import time
+from datetime import datetime, timedelta
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SECRET_KEY'] = 'secret-key'
 
+app.config['JWT_SECRET_KEY'] = 'jwt-secret-key' 
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=15)
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+
 db = SQLAlchemy(app)
+
+class RefreshToken(db.Model):
+	id = db.Column(db.Integer, primary_key=True)
+	token = db.Column(db.String(500), unique=True, nullable=False)
+	expires_at = db.Column(db.DateTime, nullable=False)
+	created_at = db.Column(db.DateTime, default=datetime.utcnow)
+	user = db.relationship('User', backref=db.backref('refresh_tokens', lazy=True))
+	user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 class User(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
@@ -439,6 +455,136 @@ def api_delete_comment(id):
 	db.session.commit()
 	
 	return jsonify({'message': 'Комментарий удален'})
+
+def create_access_token(user_id):
+	payload = {
+		'exp': datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES'],
+		'iat': datetime.utcnow(),
+		'sub': user_id,
+		'type': 'access'
+	}
+	return jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+def create_refresh_token(user_id):
+	expires_at = datetime.utcnow() + app.config['JWT_REFRESH_TOKEN_EXPIRES']
+	
+	payload = {
+		'exp': expires_at,
+		'iat': datetime.utcnow(),
+		'sub': user_id,
+		'type': 'refresh'
+	}
+	
+	refresh_token = jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+	
+	db_refresh_token = RefreshToken(
+		token=refresh_token,
+		user_id=user_id,
+		expires_at=expires_at
+	)
+	db.session.add(db_refresh_token)
+	db.session.commit()
+	
+	return refresh_token
+
+def verify_token(token):
+	try:
+		payload = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+		return payload
+	except jwt.ExpiredSignatureError:
+		return None  
+	except jwt.InvalidTokenError:
+		return None 
+
+def get_user_from_token(token):
+	payload = verify_token(token)
+	if payload:
+		return User.query.get(payload['sub'])
+	return None
+
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+	data = request.json
+	
+	if not data or not data.get('email') or not data.get('password'):
+		return jsonify({'error': 'Требуется email и пароль'}), 400
+	
+	user = User.query.filter_by(email=data['email']).first()
+	
+	if user and user.check_password(data['password']):
+		access_token = create_access_token(user.id)
+		refresh_token = create_refresh_token(user.id)
+		
+		return jsonify({
+				'access_token': access_token,
+				'refresh_token': refresh_token,
+				'user': {
+					'id': user.id,
+					'name': user.name,
+					'email': user.email
+				}
+		}), 200
+	else:
+		return jsonify({'error': 'Неверный email или пароль'}), 401
+
+@app.route('/api/auth/refresh', methods=['POST'])
+def api_refresh():
+	data = request.json
+	
+	if not data or not data.get('refresh_token'):
+		return jsonify({'error': 'Требуется refresh token'}), 400
+	
+	refresh_token = data['refresh_token']
+	
+	db_refresh_token = RefreshToken.query.filter_by(token=refresh_token).first()
+	
+	if not db_refresh_token or db_refresh_token.expires_at < datetime.utcnow():
+		return jsonify({'error': 'Невалидный или истекший refresh token'}), 401
+	
+	payload = verify_token(refresh_token)
+	if not payload or payload.get('type') != 'refresh':
+		return jsonify({'error': 'Невалидный refresh token'}), 401
+	
+	new_access_token = create_access_token(payload['sub'])
+	
+	return jsonify({
+		'access_token': new_access_token
+	}), 200
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+	data = request.json
+	
+	if not data or not data.get('refresh_token'):
+		return jsonify({'error': 'Требуется refresh token'}), 400
+	
+	refresh_token = RefreshToken.query.filter_by(token=data['refresh_token']).first()
+	if refresh_token:
+		db.session.delete(refresh_token)
+		db.session.commit()
+	
+	return jsonify({'message': 'Успешный выход из системы'}), 200
+
+@app.route('/api/auth/me', methods=['GET'])
+def api_get_current_user():
+	auth_header = request.headers.get('Authorization')
+	
+	if not auth_header or not auth_header.startswith('Bearer '):
+		return jsonify({'error': 'Требуется Bearer token'}), 401
+	
+	token = auth_header.split(' ')[1]
+	user = get_user_from_token(token)
+	
+	if not user:
+		return jsonify({'error': 'Невалидный токен'}), 401
+	
+	return jsonify({
+		'user': {
+				'id': user.id,
+				'name': user.name,
+				'email': user.email
+		}
+	}), 200
 
 if __name__ == "__main__":
 	app.run(debug=True)
