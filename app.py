@@ -277,18 +277,18 @@ def api_get_articles():
 
 @app.route('/api/articles/<int:id>', methods=['GET'])
 def api_get_article(id):
-    article = Article.query.get(id)
-    if not article:
-        return jsonify({'error': 'Статья не найдена'}), 404
-    
-    return jsonify({
-        'id': article.id,
-        'title': article.title,
-        'text': article.text,
-        'category': article.category,
-        'created_date': article.created_date.isoformat(),
-        'user_id': article.user_id
-    })
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	return jsonify({
+		'id': article.id,
+		'title': article.title,
+		'text': article.text,
+		'category': article.category,
+		'created_date': article.created_date.isoformat(),
+		'user_id': article.user_id
+	})
 
 @app.route('/api/articles', methods=['POST'])
 def api_create_article():
@@ -456,6 +456,25 @@ def api_delete_comment(id):
 	
 	return jsonify({'message': 'Комментарий удален'})
 
+def token_required(f):
+	@wraps(f)
+	def decorated(*args, **kwargs):
+		auth_header = request.headers.get('Authorization')
+		
+		if not auth_header or not auth_header.startswith('Bearer '):
+				return jsonify({'error': 'Требуется Bearer token'}), 401
+		
+		token = auth_header.split(' ')[1]
+		user = get_user_from_token(token)
+		
+		if not user:
+				return jsonify({'error': 'Невалидный или просроченный токен'}), 401
+		
+		request.current_user = user
+		return f(*args, **kwargs)
+	
+	return decorated
+
 def create_access_token(user_id):
 	payload = {
 		'exp': datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES'],
@@ -498,7 +517,7 @@ def verify_token(token):
 
 def get_user_from_token(token):
 	payload = verify_token(token)
-	if payload:
+	if payload and payload.get('type') == 'access': 
 		return User.query.get(payload['sub'])
 	return None
 
@@ -516,13 +535,13 @@ def api_login():
 		refresh_token = create_refresh_token(user.id)
 		
 		return jsonify({
-				'access_token': access_token,
-				'refresh_token': refresh_token,
-				'user': {
-					'id': user.id,
-					'name': user.name,
-					'email': user.email
-				}
+					'access_token': access_token,
+					'refresh_token': refresh_token,
+					'user': {
+						'id': user.id,
+						'name': user.name,
+						'email': user.email
+					}
 		}), 200
 	else:
 		return jsonify({'error': 'Неверный email или пароль'}), 401
@@ -566,25 +585,16 @@ def api_logout():
 	return jsonify({'message': 'Успешный выход из системы'}), 200
 
 @app.route('/api/auth/me', methods=['GET'])
+@token_required
 def api_get_current_user():
-	auth_header = request.headers.get('Authorization')
-	
-	if not auth_header or not auth_header.startswith('Bearer '):
-		return jsonify({'error': 'Требуется Bearer token'}), 401
-	
-	token = auth_header.split(' ')[1]
-	user = get_user_from_token(token)
-	
-	if not user:
-		return jsonify({'error': 'Невалидный токен'}), 401
-	
 	return jsonify({
 		'user': {
-				'id': user.id,
-				'name': user.name,
-				'email': user.email
+				'id': request.current_user.id,
+				'name': request.current_user.name,
+				'email': request.current_user.email
 		}
 	}), 200
 
 if __name__ == "__main__":
 	app.run(debug=True)
+	
