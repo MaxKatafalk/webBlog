@@ -1,11 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
-import time
-from datetime import datetime, timedelta
-from functools import wraps
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
@@ -456,30 +453,11 @@ def api_delete_comment(id):
 	
 	return jsonify({'message': 'Комментарий удален'})
 
-def token_required(f):
-	@wraps(f)
-	def decorated(*args, **kwargs):
-		auth_header = request.headers.get('Authorization')
-		
-		if not auth_header or not auth_header.startswith('Bearer '):
-				return jsonify({'error': 'Требуется Bearer token'}), 401
-		
-		token = auth_header.split(' ')[1]
-		user = get_user_from_token(token)
-		
-		if not user:
-				return jsonify({'error': 'Невалидный или просроченный токен'}), 401
-		
-		request.current_user = user
-		return f(*args, **kwargs)
-	
-	return decorated
-
 def create_access_token(user_id):
 	payload = {
 		'exp': datetime.utcnow() + app.config['JWT_ACCESS_TOKEN_EXPIRES'],
 		'iat': datetime.utcnow(),
-		'sub': user_id,
+		'sub': str(user_id),
 		'type': 'access'
 	}
 	return jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
@@ -490,7 +468,7 @@ def create_refresh_token(user_id):
 	payload = {
 		'exp': expires_at,
 		'iat': datetime.utcnow(),
-		'sub': user_id,
+		'sub': str(user_id),
 		'type': 'refresh'
 	}
 	
@@ -585,7 +563,6 @@ def api_logout():
 	return jsonify({'message': 'Успешный выход из системы'}), 200
 
 @app.route('/api/auth/me', methods=['GET'])
-@token_required
 def api_get_current_user():
 	return jsonify({
 		'user': {
