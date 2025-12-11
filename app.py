@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g
 from datetime import date, datetime, timedelta
+from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
@@ -548,6 +549,32 @@ def api_refresh():
 		'access_token': new_access_token
 	}), 200
 
+def jwt_required(f):
+	@wraps(f)
+	def wrapper(*args, **kwargs):
+		auth = request.headers.get("Authorization")
+
+		if not auth or not auth.startswith("Bearer "):
+				return jsonify({"error": "Требуется access токен"}), 401
+
+		token = auth.split()[1]
+		payload = verify_token(token)
+
+		if not payload:
+				return jsonify({"error": "Недействительный или истекший токен"}), 401
+
+		if payload.get("type") != "access":
+				return jsonify({"error": "Неверный тип токена"}), 403
+
+		user = User.query.get(payload["sub"])
+		if not user:
+				return jsonify({"error": "Пользователь не найден"}), 404
+
+		g.current_user = user
+		return f(*args, **kwargs)
+	return wrapper
+
+
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
 	data = request.json
@@ -563,12 +590,13 @@ def api_logout():
 	return jsonify({'message': 'Успешный выход из системы'}), 200
 
 @app.route('/api/auth/me', methods=['GET'])
+@jwt_required
 def api_get_current_user():
 	return jsonify({
-		'user': {
-				'id': request.current_user.id,
-				'name': request.current_user.name,
-				'email': request.current_user.email
+		"user": {
+				"id": g.current_user.id,
+				"name": g.current_user.name,
+				"email": g.current_user.email
 		}
 	}), 200
 
