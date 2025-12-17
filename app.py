@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SECRET_KEY'] = 'secret-key'
 
-app.config['JWT_SECRET_KEY'] = 'jwt-secret-key' 
+app.config['JWT_SECRET_KEY'] = 'jwt-secret-key'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=15)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 
@@ -27,7 +27,7 @@ class User(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
 	name = db.Column(db.String(100), nullable=False)
 	email = db.Column(db.String(100), unique=True, nullable=False)
-	hashed_password = db.Column(db.String(100), nullable=False)
+	hashed_password = db.Column(db.String(200), nullable=False)
 	created_date = db.Column(db.DateTime, default=datetime.utcnow)
 	articles = db.relationship('Article', backref='author')
 	def set_password(self, password):
@@ -245,214 +245,11 @@ def about():
 def contact():
 	return render_template('contact.html')
 
-@app.route('/api/articles', methods=['GET'])
-def api_get_articles():
-	category = request.args.get('category')
-	sort = request.args.get('sort')
-	
-	query = Article.query
-	
-	if category:
-		query = query.filter_by(category=category)
-	
-	if sort == 'date':
-		query = query.order_by(Article.created_date.desc())
-	else:
-		query = query.order_by(Article.created_date.desc())
-	
-	articles = query.all()
-	
-	articles_list = []
-	for article in articles:
-		articles_list.append({
-				'id': article.id,
-				'title': article.title,
-				'category': article.category,
-				'created_date': article.created_date.isoformat()
-		})
-	
-	return jsonify(articles_list)
 
-@app.route('/api/articles/<int:id>', methods=['GET'])
-def api_get_article(id):
-	article = Article.query.get(id)
-	if not article:
-		return jsonify({'error': 'Статья не найдена'}), 404
-	
-	return jsonify({
-		'id': article.id,
-		'title': article.title,
-		'text': article.text,
-		'category': article.category,
-		'created_date': article.created_date.isoformat(),
-		'user_id': article.user_id
-	})
-
-@app.route('/api/articles', methods=['POST'])
-def api_create_article():
-	
-	if 'user_id' not in session:
-		return jsonify({'error': 'Требуется авторизация'}), 401
-
-	data = request.json
-	
-	if not data.get('title') or not data.get('text'):
-		return jsonify({'error': 'Нужны title и text'}), 400
-	
-	new_article = Article(
-		title=data['title'],
-		text=data['text'],
-		category=data.get('category', 'general'),
-		user_id=session['user.id']
-	)
-	
-	db.session.add(new_article)
-	db.session.commit()
-	
-	return jsonify({
-		'id': new_article.id,
-		'title': new_article.title,
-		'text': new_article.text,
-		'category': new_article.category
-	}), 201
-
-@app.route('/api/articles/<int:id>', methods=['PUT'])
-def api_update_article(id):
-	if 'user_id' not in session:
-		return jsonify({'error': 'Требуется авторизация'}), 401
-
-	article = Article.query.get(id)
-	if not article:
-		return jsonify({'error': 'Статья не найдена'}), 404
-	
-	if article.user_id != session['user_id']:
-		return jsonify({'error': 'Вы можете редактировать только свои статьи'}), 403
-	
-	data = request.json
-	
-	if not data.get('title') or not data.get('text'):
-		return jsonify({'error': 'Нужны title и text'}), 400
-	
-	article.title = data['title']
-	article.text = data['text']
-	article.category = data.get('category', article.category)
-	
-	db.session.commit()
-	
-	return jsonify({
-		'id': article.id,
-		'title': article.title,
-		'text': article.text,
-		'category': article.category
-	})
-
-@app.route('/api/articles/<int:id>', methods=['DELETE'])
-def api_delete_article(id):
-	if 'user_id' not in session:
-		return jsonify({'error': 'Требуется авторизация'}), 401
-
-	article = Article.query.get(id)
-	if not article:
-		return jsonify({'error': 'Статья не найдена'}), 404
-
-	if article.user_id != session['user_id']:
-		return jsonify({'error': 'Вы можете удалять только свои статьи'}), 403
-	
-	Comment.query.filter_by(article_id=id).delete()
-	
-	db.session.delete(article)
-	db.session.commit()
-	
-	return jsonify({'message': 'Статья удалена'})
-
-@app.route('/api/comment', methods=['GET'])
-def api_get_comments():
-	comments = Comment.query.all()
-	
-	comments_list = []
-	for comment in comments:
-		comments_list.append({
-				'id': comment.id,
-				'text': comment.text,
-				'author_name': comment.author_name,
-				'date': comment.date.isoformat(),
-				'article_id': comment.article_id
-		})
-	
-	return jsonify(comments_list)
-
-@app.route('/api/comment/<int:id>', methods=['GET'])
-def api_get_comment(id):
-	comment = Comment.query.get(id)
-	
-	if not comment:
-		return jsonify({'error': 'Комментарий не найден'}), 404
-	
-	comment_data = {
-		'id': comment.id,
-		'text': comment.text,
-		'author_name': comment.author_name,
-		'date': comment.date.isoformat(),
-		'article_id': comment.article_id
-	}
-	
-	return jsonify(comment_data)
-
-@app.route('/api/comment', methods=['POST'])
-def api_create_comment():
-	data = request.json
-	
-	if not data.get('text') or not data.get('author_name') or not data.get('article_id'):
-		return jsonify({'error': 'Нужны text, author_name и article_id'}), 400
-	
-	new_comment = Comment(
-		text=data['text'],
-		author_name=data['author_name'],
-		article_id=data['article_id']
-	)
-	
-	db.session.add(new_comment)
-	db.session.commit()
-	
-	return jsonify({
-		'id': new_comment.id,
-		'text': new_comment.text,
-		'author_name': new_comment.author_name,
-		'article_id': new_comment.article_id
-	}), 201
-
-@app.route('/api/comment/<int:id>', methods=['PUT'])
-def api_update_comment(id):
-	comment = Comment.query.get(id)
-	if not comment:
-		return jsonify({'error': 'Комментарий не найден'}), 404
-	
-	data = request.json
-	
-	if not data.get('text'):
-		return jsonify({'error': 'Нужен text'}), 400
-	
-	comment.text = data['text']
-	comment.author_name = data.get('author_name', comment.author_name)
-	
-	db.session.commit()
-	
-	return jsonify({
-		'id': comment.id,
-		'text': comment.text,
-		'author_name': comment.author_name
-	})
-
-@app.route('/api/comment/<int:id>', methods=['DELETE'])
-def api_delete_comment(id):
-	comment = Comment.query.get(id)
-	if not comment:
-		return jsonify({'error': 'Комментарий не найден'}), 404
-	
-	db.session.delete(comment)
-	db.session.commit()
-	
-	return jsonify({'message': 'Комментарий удален'})
+def _ensure_str(token):
+	if isinstance(token, bytes):
+		return token.decode('utf-8')
+	return token
 
 def create_access_token(user_id):
 	payload = {
@@ -461,7 +258,8 @@ def create_access_token(user_id):
 		'sub': str(user_id),
 		'type': 'access'
 	}
-	return jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+	token = jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+	return _ensure_str(token)
 
 def create_refresh_token(user_id):
 	expires_at = datetime.utcnow() + app.config['JWT_REFRESH_TOKEN_EXPIRES']
@@ -474,6 +272,7 @@ def create_refresh_token(user_id):
 	}
 	
 	refresh_token = jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+	refresh_token = _ensure_str(refresh_token)
 	
 	db_refresh_token = RefreshToken(
 		token=refresh_token,
@@ -496,9 +295,257 @@ def verify_token(token):
 
 def get_user_from_token(token):
 	payload = verify_token(token)
-	if payload and payload.get('type') == 'access': 
-		return User.query.get(payload['sub'])
+	if payload and payload.get('type') == 'access':
+		try:
+			return User.query.get(int(payload['sub']))
+		except Exception:
+			return None
 	return None
+
+def jwt_required(f):
+	@wraps(f)
+	def wrapper(*args, **kwargs):
+		auth = request.headers.get("Authorization")
+
+		if not auth or not auth.startswith("Bearer "):
+				return jsonify({"error": "Требуется access токен"}), 401
+
+		token = auth.split()[1]
+		payload = verify_token(token)
+
+		if not payload:
+				return jsonify({"error": "Недействительный или истекший токен"}), 401
+
+		if payload.get("type") != "access":
+				return jsonify({"error": "Неверный тип токена"}), 403
+
+		try:
+			user_id = int(payload.get("sub"))
+		except Exception:
+			return jsonify({"error": "Неверный payload токена"}), 401
+
+		user = User.query.get(user_id)
+		if not user:
+				return jsonify({"error": "Пользователь не найден"}), 404
+
+		g.current_user = user
+		return f(*args, **kwargs)
+	return wrapper
+
+@app.route('/api/articles', methods=['GET'])
+@jwt_required
+def api_get_articles():
+	category = request.args.get('category')
+	sort = request.args.get('sort')
+	
+	query = Article.query
+	
+	if category:
+		query = query.filter_by(category=category)
+	
+	query = query.order_by(Article.created_date.desc())
+	
+	articles = query.all()
+	
+	articles_list = []
+	for article in articles:
+		articles_list.append({
+				'id': article.id,
+				'title': article.title,
+				'category': getattr(article, 'category', 'general'),
+				'created_date': article.created_date.isoformat()
+		})
+	
+	return jsonify(articles_list)
+
+@app.route('/api/articles/<int:id>', methods=['GET'])
+@jwt_required
+def api_get_article(id):
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	return jsonify({
+		'id': article.id,
+		'title': article.title,
+		'text': article.text,
+		'category': getattr(article, 'category', 'general'),
+		'created_date': article.created_date.isoformat(),
+		'user_id': article.user_id
+	})
+
+@app.route('/api/articles', methods=['POST'])
+@jwt_required
+def api_create_article():
+	data = request.json or {}
+	
+	if not g.get('current_user'):
+		return jsonify({'error': 'Требуется авторизация'}), 401
+
+	if not data.get('title') or not data.get('text'):
+		return jsonify({'error': 'Нужны title и text'}), 400
+	
+	new_article = Article(
+		title=data['title'],
+		text=data['text'],
+		category=data.get('category', 'general'),
+		user_id=g.current_user.id
+	)
+	
+	db.session.add(new_article)
+	db.session.commit()
+	
+	return jsonify({
+		'id': new_article.id,
+		'title': new_article.title,
+		'text': new_article.text,
+		'category': new_article.category
+	}), 201
+
+@app.route('/api/articles/<int:id>', methods=['PUT'])
+@jwt_required
+def api_update_article(id):
+	if not g.get('current_user'):
+		return jsonify({'error': 'Требуется авторизация'}), 401
+
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	if article.user_id != g.current_user.id:
+		return jsonify({'error': 'Вы можете редактировать только свои статьи'}), 403
+	
+	data = request.json or {}
+	
+	if not data.get('title') or not data.get('text'):
+		return jsonify({'error': 'Нужны title и text'}), 400
+	
+	article.title = data['title']
+	article.text = data['text']
+	article.category = data.get('category', getattr(article, 'category', 'general'))
+	
+	db.session.commit()
+	
+	return jsonify({
+		'id': article.id,
+		'title': article.title,
+		'text': article.text,
+		'category': article.category
+	})
+
+@app.route('/api/articles/<int:id>', methods=['DELETE'])
+@jwt_required
+def api_delete_article(id):
+	if not g.get('current_user'):
+		return jsonify({'error': 'Требуется авторизация'}), 401
+
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+
+	if article.user_id != g.current_user.id:
+		return jsonify({'error': 'Вы можете удалять только свои статьи'}), 403
+	
+	Comment.query.filter_by(article_id=id).delete()
+	
+	db.session.delete(article)
+	db.session.commit()
+	
+	return jsonify({'message': 'Статья удалена'})
+
+@app.route('/api/comment', methods=['GET'])
+@jwt_required
+def api_get_comments():
+	comments = Comment.query.all()
+	
+	comments_list = []
+	for comment in comments:
+		comments_list.append({
+				'id': comment.id,
+				'text': comment.text,
+				'author_name': comment.author_name,
+				'date': comment.date.isoformat(),
+				'article_id': comment.article_id
+		})
+	
+	return jsonify(comments_list)
+
+@app.route('/api/comment/<int:id>', methods=['GET'])
+@jwt_required
+def api_get_comment(id):
+	comment = Comment.query.get(id)
+	
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	comment_data = {
+		'id': comment.id,
+		'text': comment.text,
+		'author_name': comment.author_name,
+		'date': comment.date.isoformat(),
+		'article_id': comment.article_id
+	}
+	
+	return jsonify(comment_data)
+
+@app.route('/api/comment', methods=['POST'])
+@jwt_required
+def api_create_comment():
+	data = request.json or {}
+	
+	if not data.get('text') or not data.get('author_name') or not data.get('article_id'):
+		return jsonify({'error': 'Нужны text, author_name и article_id'}), 400
+	
+	new_comment = Comment(
+		text=data['text'],
+		author_name=data['author_name'],
+		article_id=data['article_id']
+	)
+	
+	db.session.add(new_comment)
+	db.session.commit()
+	
+	return jsonify({
+		'id': new_comment.id,
+		'text': new_comment.text,
+		'author_name': new_comment.author_name,
+		'article_id': new_comment.article_id
+	}), 201
+
+@app.route('/api/comment/<int:id>', methods=['PUT'])
+@jwt_required
+def api_update_comment(id):
+	comment = Comment.query.get(id)
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	data = request.json or {}
+	
+	if not data.get('text'):
+		return jsonify({'error': 'Нужен text'}), 400
+	
+	comment.text = data['text']
+	comment.author_name = data.get('author_name', comment.author_name)
+	
+	db.session.commit()
+	
+	return jsonify({
+		'id': comment.id,
+		'text': comment.text,
+		'author_name': comment.author_name
+	})
+
+@app.route('/api/comment/<int:id>', methods=['DELETE'])
+@jwt_required
+def api_delete_comment(id):
+	comment = Comment.query.get(id)
+	if not comment:
+		return jsonify({'error': 'Комментарий не найден'}), 404
+	
+	db.session.delete(comment)
+	db.session.commit()
+	
+	return jsonify({'message': 'Комментарий удален'})
 
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
@@ -543,37 +590,16 @@ def api_refresh():
 	if not payload or payload.get('type') != 'refresh':
 		return jsonify({'error': 'Невалидный refresh token'}), 401
 	
-	new_access_token = create_access_token(payload['sub'])
+	try:
+		sub_id = int(payload['sub'])
+	except Exception:
+		return jsonify({'error': 'Неверный payload в refresh token'}), 401
+	
+	new_access_token = create_access_token(sub_id)
 	
 	return jsonify({
 		'access_token': new_access_token
 	}), 200
-
-def jwt_required(f):
-	@wraps(f)
-	def wrapper(*args, **kwargs):
-		auth = request.headers.get("Authorization")
-
-		if not auth or not auth.startswith("Bearer "):
-				return jsonify({"error": "Требуется access токен"}), 401
-
-		token = auth.split()[1]
-		payload = verify_token(token)
-
-		if not payload:
-				return jsonify({"error": "Недействительный или истекший токен"}), 401
-
-		if payload.get("type") != "access":
-				return jsonify({"error": "Неверный тип токена"}), 403
-
-		user = User.query.get(payload["sub"])
-		if not user:
-				return jsonify({"error": "Пользователь не найден"}), 404
-
-		g.current_user = user
-		return f(*args, **kwargs)
-	return wrapper
-
 
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
@@ -602,4 +628,3 @@ def api_get_current_user():
 
 if __name__ == "__main__":
 	app.run(debug=True)
-	
