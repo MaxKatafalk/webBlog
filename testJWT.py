@@ -152,10 +152,6 @@ def test_logout(refresh_token):
 	print()
 
 
-# =========================
-# ЗАПУСК
-# =========================
-
 tokens = test_login()
 
 if tokens:

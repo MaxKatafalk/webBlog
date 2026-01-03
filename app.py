@@ -4,6 +4,7 @@ from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
+from flask_cors import CORS
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
@@ -12,6 +13,8 @@ app.config['SECRET_KEY'] = 'secret-key'
 app.config['JWT_SECRET_KEY'] = 'jwt-secret-key'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=15)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+
+CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
 
 db = SQLAlchemy(app)
 
@@ -625,6 +628,141 @@ def api_get_current_user():
 				"email": g.current_user.email
 		}
 	}), 200
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+	data = request.json
+	
+	if not data or not data.get('name') or not data.get('email') or not data.get('password'):
+		return jsonify({'error': 'Требуется имя, email и пароль'}), 400
+	
+	existing_user = User.query.filter_by(email=data['email']).first()
+	if existing_user:
+		return jsonify({'error': 'Пользователь с таким email уже существует'}), 400
+	
+	new_user = User(
+		name=data['name'],
+		email=data['email']
+	)
+	new_user.set_password(data['password'])
+	
+	db.session.add(new_user)
+	db.session.commit()
+	
+	access_token = create_access_token(new_user.id)
+	refresh_token = create_refresh_token(new_user.id)
+	
+	return jsonify({
+		'access_token': access_token,
+		'refresh_token': refresh_token,
+		'user': {
+				'id': new_user.id,
+				'name': new_user.name,
+				'email': new_user.email
+		}
+	}), 201
+
+@app.route('/api/categories', methods=['GET'])
+def api_get_categories():
+	categories = db.session.query(Article.category).distinct().all()
+	categories = [cat[0] for cat in categories if cat[0]]
+	return jsonify(categories)
+
+@app.route('/api/public/articles', methods=['GET'])
+def api_public_articles():
+	category = request.args.get('category')
+	limit = request.args.get('limit', 10, type=int)
+	
+	query = Article.query
+	
+	if category:
+		query = query.filter_by(category=category)
+	
+	query = query.order_by(Article.created_date.desc()).limit(limit)
+	
+	articles = query.all()
+	
+	articles_list = []
+	for article in articles:
+		articles_list.append({
+				'id': article.id,
+				'title': article.title,
+				'preview': article.text[:200] + '...' if len(article.text) > 200 else article.text,
+				'category': article.category,
+				'created_date': article.created_date.isoformat(),
+				'author_name': article.author.name if article.author else 'Аноним'
+		})
+	
+	return jsonify(articles_list)
+
+@app.route('/api/public/articles/<int:id>', methods=['GET'])
+def api_public_article(id):
+	article = Article.query.get(id)
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	comments = Comment.query.filter_by(article_id=id).order_by(Comment.date.desc()).all()
+	
+	return jsonify({
+		'id': article.id,
+		'title': article.title,
+		'text': article.text,
+		'category': article.category,
+		'created_date': article.created_date.isoformat(),
+		'author_name': article.author.name if article.author else 'Аноним',
+		'comments': [
+				{
+					'id': comment.id,
+					'text': comment.text,
+					'author_name': comment.author_name,
+					'date': comment.date.isoformat()
+				}
+				for comment in comments
+		]
+	})
+
+@app.route('/api/public/comments', methods=['POST'])
+def api_public_create_comment():
+	data = request.json or {}
+	
+	if not data.get('text') or not data.get('author_name') or not data.get('article_id'):
+		return jsonify({'error': 'Нужны text, author_name и article_id'}), 400
+	
+	article = Article.query.get(data['article_id'])
+	if not article:
+		return jsonify({'error': 'Статья не найдена'}), 404
+	
+	new_comment = Comment(
+		text=data['text'],
+		author_name=data['author_name'],
+		article_id=data['article_id']
+	)
+	
+	db.session.add(new_comment)
+	db.session.commit()
+	
+	return jsonify({
+		'id': new_comment.id,
+		'text': new_comment.text,
+		'author_name': new_comment.author_name,
+		'article_id': new_comment.article_id,
+		'date': new_comment.date.isoformat()
+	}), 201
+
+@app.route('/api/public/articles/<int:id>/comments', methods=['GET'])
+def api_public_article_comments(id):
+	comments = Comment.query.filter_by(article_id=id).order_by(Comment.date.desc()).all()
+	
+	comments_list = []
+	for comment in comments:
+		comments_list.append({
+				'id': comment.id,
+				'text': comment.text,
+				'author_name': comment.author_name,
+				'date': comment.date.isoformat()
+		})
+	
+	return jsonify(comments_list)
 
 if __name__ == "__main__":
 	app.run(debug=True)
